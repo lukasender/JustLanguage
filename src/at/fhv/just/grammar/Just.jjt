@@ -1,0 +1,286 @@
+/**
+ * JJTree template file created by SF JavaCC plugin 1.5.17+ wizard for JavaCC 1.5.0+
+ */options{  JDK_VERSION = "1.6";
+  LOOKAHEAD = 3;  static = true;}PARSER_BEGIN(JustParser)
+package at.fhv.just.grammar;
+
+import at.fhv.just.grammar.semantic.*;
+
+public class JustParser{
+
+  private static SymbolTable m_symbolTable = new SymbolTable();
+    public static void main(String args [])  {    System.out.println("Reading from standard input...");    new JustParser(System.in);    try    {      SimpleNode n = JustParser.Start();      System.out.println("Thank you.");    }    catch (Exception e)    {      System.out.println("Oops.");      System.out.println(e.getMessage());    }  }}PARSER_END(JustParser)SKIP :{  " "| "\t"| "\n"| "\r"| < "//" (~[ "\n", "\r" ])*    (      "\n"    | "\r"    | "\r\n"    ) >| < "/*" (~[ "*" ])* "*"    (      ~[ "/" ] (~[ "*" ])* "*"    )*    "/" >}TOKEN : /* LITERALS */{  < INTEGER_LITERAL :    < DECIMAL_LITERAL > ([ "l", "L" ])?  | < HEX_LITERAL > ([ "l", "L" ])?  | < OCTAL_LITERAL > ([ "l", "L" ])?     >| < #DECIMAL_LITERAL : [ "1"-"9" ] ([ "0"-"9" ])* >| < #HEX_LITERAL : "0" [ "x", "X" ] ([ "0"-"9", "a"-"f", "A"-"F" ])+ >| < #OCTAL_LITERAL : "0" ([ "0"-"7" ])* >}
+
+TOKEN :
+{
+  < Number : < INTEGER_LITERAL > >
+  | < PROGRAM : "program" >
+  | < VoidType : "void" >
+  | < IntType : "int" >
+  | < BooleanType : "boolean" >
+  | < byref : "byref" >
+  | < If : "if" >
+  | < Else : "else" >
+  | < While : "while" >
+  | < Return : "return" >
+}
+
+TOKEN :
+{
+  < TrueValue : "true" >
+| < FalseValue : "false" >
+
+}
+TOKEN : /* IDENTIFIERS */{  < IDENTIFIER :    < LETTER >    (      < LETTER >    | < DIGIT >    )* >| < LETTER : [ "_", "a"-"z", "A"-"Z" ] >
+| < DIGIT : [ "0"-"9" ] > }
+
+SimpleNode Start() :{}{  CompilationUnit()  {    return jjtThis;  }}void CompilationUnit() :
+{}{
+   < PROGRAM > < IDENTIFIER > "{" Definition() "}"
+   {
+     m_symbolTable.leaveScope();   }}void Definition() :{}{
+  ( LOOKAHEAD(VarDef()) VarDef() | FuncDef() )*
+}
+
+void VarDef() :{
+  Token token;
+  Type type;
+}
+{   type = Type() token = < IDENTIFIER > (Init())? ";"
+   {
+     m_symbolTable.insert(token.image, type, Symbol.Kind.varKind);   }}
+
+void Init() :{}{
+  "=" (< TrueValue > | < FalseValue > | < INTEGER_LITERAL >)}
+
+Type Type() :{}{
+  < VoidType >  {
+    return Type.voidType;  }
+  | < IntType >
+  {
+    return Type.intType;  }
+  | < BooleanType >  {
+    return Type.booleanType;
+  }}
+
+void FuncDef() :
+{}{
+  FuncHead() Block(false)}
+
+void FuncHead() :
+{
+  Token token;
+  Type type;
+}{
+  type = Type() token = < IDENTIFIER >
+  "("
+  		{
+    		m_symbolTable.enterScope();
+  		}
+   		(FormParList())+
+   ")"
+  {
+     m_symbolTable.insert(token.image, type, Symbol.Kind.funcKind);
+   }}
+
+void FormParList() :
+{}{
+  (< byref >)? Type() < IDENTIFIER > ("," (< byref >)? Type() < IDENTIFIER >)* }
+
+void Block(boolean openScope) :
+{}{
+  {
+    if (openScope) {	    m_symbolTable.enterScope();
+    }
+  }
+  "{" (VarDef() | Stat())* "}"
+  {
+    m_symbolTable.leaveScope();
+  }}
+
+void Stat() :{}{
+  LOOKAHEAD(AssignStat()) AssignStat() | CallStat() | IfStat() | WhileStat() | ReturnStat() | Block(true) | ";"
+}
+
+void AssignStat() :
+{
+  Token token;
+  boolean isArray = false;
+  Symbol symbol;
+}
+{
+  token = < IDENTIFIER >
+  { symbol = m_symbolTable.lookup(token.image); }
+
+  	[
+		{
+			isArray = true;
+			// m_codeGen.emit2(Opcode.ALOAD, symbol.adr);
+		}
+		"[" Expr() "]"
+	]
+
+	"=" Expr() ";"
+	{
+		if (isArray) {
+			// m_codeGen.emit1(Opcode.IASTORE);
+		} else {
+			// m_codeGen.emit2(Opcode.ISTORE, symbol.adr);
+		}
+	}
+}
+
+void CallStat() :{}{
+  Call() ";"}
+
+void Call() :{}{
+  < IDENTIFIER > "(" (ActParList())? ")"}
+
+void ActParList() :
+{}{
+  Expr() ("," Expr())*}
+
+void IfStat() :{}{
+  < If > "(" Expr() ")" Stat() (< Else > Stat())?}
+
+void WhileStat() :{}{
+  < While > "(" Expr() ")" Block(true)}
+
+void ReturnStat() :{}{
+  < Return > (Expr())? ";"}
+
+Symbol Expr() :
+{
+  Symbol symbol;
+}{
+   symbol = OrExpr()
+   {
+     return symbol;   }
+}
+
+Symbol OrExpr() :{
+  Symbol symbolLeft;
+  Symbol symbolRight;
+}{
+  symbolLeft = AndExpr() (
+    "||" symbolRight = AndExpr()
+    {
+		if (symbolRight != null && symbolLeft.type != symbolRight.type) {
+  			throw new ParseException();
+		}
+		Symbol symbol = new Symbol();
+		symbol.type = Type.booleanType;
+		return symbol;
+  	}
+    )*
+    {
+      return symbolLeft;    }}
+
+Symbol AndExpr() :{
+  Symbol symbolLeft;
+  Symbol symbolRight;
+}{
+  symbolLeft = RelExpr()
+  ( "&&" symbolRight = RelExpr()
+  	{
+		if (symbolRight != null && symbolLeft.type != symbolRight.type) {
+  			throw new ParseException();
+		}
+		Symbol symbol = new Symbol();
+		symbol.type = Type.booleanType;
+		return symbol;
+  	}
+  )*
+  {
+    return symbolLeft;  }}
+
+Symbol RelExpr() :
+{
+  Symbol symbolLeft;
+  Symbol symbolRight;
+}{
+  symbolLeft = SimpleExpr() (
+    (
+      "==" | "!=" | "<" | "<=" | ">" | ">=") symbolRight = SimpleExpr()
+      	{
+    		if (symbolRight != null && symbolLeft.type != symbolRight.type) {
+      			throw new ParseException();
+    		}
+    		Symbol symbol = new Symbol();
+    		symbol.type = Type.booleanType;
+    		return symbol;
+  		}
+   	)?
+  {
+    return symbolLeft;  }
+}
+
+Symbol SimpleExpr() :{
+  Symbol symbol;
+}{
+  ("+" | "-")? symbol = Term() ( ("+" | "-") symbol = Term() )*
+  {
+    return symbol;
+  }}
+Symbol Term() :{
+  Symbol symbol;
+}{
+  symbol = NotFact() ( ( "*" | "/") symbol = NotFact() )*
+  {    return symbol;
+  }
+}
+
+Symbol NotFact() :{
+  Symbol symbol;
+  boolean isNot = false;
+}{
+  ("!"
+  {
+    isNot = true;  })? symbol = Fact()
+  {
+    if (isNot && symbol.type.kind != Type.Kind.booleanKind)    {
+     throw new ParseException();
+    }
+    
+    return symbol;
+  }
+}
+
+Symbol Fact() :{
+  Token token;
+  Symbol symbol;
+}
+{  < FalseValue >
+  {
+    symbol = new Symbol();
+    symbol.kind = Symbol.Kind.constKind;
+    symbol.type = Type.booleanType;
+    symbol.val = 0;
+    symbol.init = true;
+    return symbol;
+  }
+      | < TrueValue >
+  {
+    symbol = new Symbol();
+    symbol.kind = Symbol.Kind.constKind;
+    symbol.type = Type.booleanType;
+    symbol.val = 1;
+    symbol.init = true;
+    return symbol;
+  }
+  | token = < INTEGER_LITERAL >
+  {
+    symbol = new Symbol();
+    symbol.kind = Symbol.Kind.constKind;
+    symbol.type = Type.intType;
+    symbol.val = Integer.valueOf(token.image);
+    return symbol;	}
+    
+  | token = < IDENTIFIER > ("(" (ActParList())? ")" )?
+  {
+    return m_symbolTable.lookup(token.image);
+  }
+  | "(" symbol = Expr() ")"
+  {
+ 	return symbol;
+  }}
