@@ -45,13 +45,38 @@ SimpleNode Start() :{}{  CompilationUnit()  {    return jjtThis;  }}voi
 void VarDef() :{
   Token token;
   Type type;
+  Symbol symbol;
+  Symbol initSymbol;
 }
-{   type = Type() token = < IDENTIFIER > (Init())? ";"
+{   type = Type() token = < IDENTIFIER > 
    {
-     m_symbolTable.insert(token.image, type, Symbol.Kind.varKind);   }}
+     symbol = m_symbolTable.insert(token.image, type, Symbol.Kind.varKind);   }
+   (
+     initSymbol = Init()
+     {
+       symbol.init = true;
+       symbol.val = initSymbol.val;     }
+   )? ";"}
 
-void Init() :{}{
-  "=" (< TrueValue > | < FalseValue > | < INTEGER_LITERAL >)}
+Symbol Init() :{
+  Symbol symbol = new Symbol();
+  Token token;
+}{
+  "=" (
+    < TrueValue >
+    {
+      symbol.val = 1;    }
+    | < FalseValue >
+    {
+      symbol.val = 0;
+    }
+    | token = < INTEGER_LITERAL >
+    {      symbol.val = Integer.valueOf(token.image);
+    }
+   )
+   {
+     return symbol;
+   }}
 
 Type Type() :{}{
   < VoidType >  {
@@ -71,21 +96,51 @@ void FuncHead() :
 {
   Token token;
   Type type;
+  Symbol parListSymbol;
 }{
   type = Type() token = < IDENTIFIER >
   "("
   		{
     		m_symbolTable.enterScope();
   		}
-   		(FormParList())+
+   		(parListSymbol = FormParList())+
    ")"
   {
-     m_symbolTable.insert(token.image, type, Symbol.Kind.funcKind);
-   }}
+    StringBuilder name = new StringBuilder(token.image);
+    Symbol s = parListSymbol;
+    while (s != null) {      name.append("_").append(s.type.name);
+      s = s.next;
+    }
+    s = m_symbolTable.insert(name.toString(), type, Symbol.Kind.funcKind);
+    s.defined = true;
+    s.symbols = parListSymbol;
+  }}
 
-void FormParList() :
-{}{
-  (< byref >)? Type() < IDENTIFIER > ("," (< byref >)? Type() < IDENTIFIER >)* }
+Symbol FormParList() :
+{
+  Symbol symbol;
+  Symbol last;
+  Type type;
+  Token token;
+}{
+  (< byref >)? type = Type() token = < IDENTIFIER >
+  {
+    last = symbol = m_symbolTable.insert(token.image, type, Symbol.Kind.parKind);
+    symbol.init = true;
+    /* TODO: byref / byvalue */  }
+   (
+     "," (< byref >)? type = Type() token = < IDENTIFIER >
+	  {
+	    Symbol s = m_symbolTable.insert(token.image, type, Symbol.Kind.parKind);
+	    s.init = true;
+	    /* TODO: byref / byvalue */
+
+		last.next = s;
+		last = s;
+	  }
+    )*
+  {     return symbol;
+  }}
 
 void Block(boolean openScope) :
 {}{
@@ -133,12 +188,41 @@ void AssignStat() :
 void CallStat() :{}{
   Call() ";"}
 
-void Call() :{}{
-  < IDENTIFIER > "(" (ActParList())? ")"}
+void Call() :{
+  Token token;
+  Symbol params = null;
+  Symbol symbol;
+}{
+  token = < IDENTIFIER > "(" ( params = ActParList())? ")"
+  {    StringBuilder name = new StringBuilder(token.image);
+    Symbol s = params;
+    while (s != null) {
+      name.append("_").append(s.type.name);
+      // TODO: mark for fixup if symbol is global undeclared variable
+      s = s.next;
+    }
+    symbol = m_symbolTable.lookup(name.toString());
+    symbol.symbols = params;
+  }}
 
-void ActParList() :
-{}{
-  Expr() ("," Expr())*}
+Symbol ActParList() :
+{
+  Symbol symbol;
+  Symbol current;
+  Symbol last;
+}{
+  symbol = Expr()
+  {
+    last = symbol;  }
+  (
+    "," current = Expr()
+    {
+      last.next = current;
+      last = current;
+    }
+  )*
+  {    return symbol;
+  }}
 
 void IfStat() :{}{
   < If > "(" Expr() ")" Stat() (< Else > Stat())?}

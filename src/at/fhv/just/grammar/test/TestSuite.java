@@ -25,7 +25,7 @@ public class TestSuite {
 			File[] files = testFolder.listFiles();
 			
 			for(int i = 0; i < files.length; i++) {
-				System.out.println("Test case " + (i+1) + ":");
+				System.out.println("Test case " + files[i].getName() + ":");
 				if(files[i].isFile()) {
 					testFile = files[i].getAbsoluteFile();
 					stream = new FileInputStream(testFile);

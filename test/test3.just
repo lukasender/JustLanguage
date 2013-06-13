@@ -13,6 +13,15 @@ program TestProgram {
 			b = false;
 			k = 10;
 		}
+		int k = 5000;
 		
+		foo(25);
+	}
+	
+	int foo(int a) {
+		a = 25;
+	}
+	
+	int foo(boolean b) {
 	}
 }

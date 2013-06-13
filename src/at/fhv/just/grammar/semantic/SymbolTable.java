@@ -27,20 +27,22 @@ public class SymbolTable {
 		return curScope.find(symbolName, true);
 	}
 	
-	public void insert(String symbolName, Type type, Symbol.Kind kind) throws ParseException {
+	public Symbol insert(String symbolName, Type type, Symbol.Kind kind) throws ParseException {
 		Symbol s = curScope.find(symbolName, false);
 		if (s == null) {
 			s = new Symbol();
+			s.name = symbolName;
 			s.kind = kind;
 			s.type = type;
 			curScope.addSymbol(s);
-		}
-		if (s.type == Type.undefType) {
+		} else if (s.type == Type.undefType) {
 			s.kind = kind;
 			s.type = type;
 		} else {
-			throw new ParseException("SymbolTable: insert(): FUUU!!!! leave me alone with your horseshit! (╯°□°）╯︵ ┻━┻");
+			throw new ParseException("SymbolTable: insert(): symbol " + symbolName + " already defined! FUUU!!!! leave me alone with your horseshit! (╯°□°）╯︵ ┻━┻");
 		}
+		
+		return s;
 	}
 
 }

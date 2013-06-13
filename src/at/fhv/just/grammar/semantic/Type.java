@@ -3,6 +3,8 @@ package at.fhv.just.grammar.semantic;
 
 public class Type {
 
+	public String name;
+	
 	public enum Kind {
 		undefKind,
 		voidKind,
@@ -12,6 +14,7 @@ public class Type {
 	};
 	
 	public Type(String name, Kind type) {
+		this.name = name;
 		spix = SymbolTable.curScope.namelist.add(name);
 		kind = type;
 	}

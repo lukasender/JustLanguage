@@ -27,5 +27,9 @@ public class Symbol {
 	
 	public int level; 			//scope level
 	public Symbol next; 		//linear list of symbols within a scope
-	
+
+	@Override
+	public String toString() {
+		return String.format("{%s type:%s kind:%s init:%s val:%d spix:%d}", name, type.name, kind, init, val, spix);
+	}
 }

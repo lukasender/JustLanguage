@@ -32,6 +32,14 @@ public class Scope {
 				if (l.spix == spix) {
 					return l;
 				} else {
+					Symbol s = l.symbols;
+					while (s != null) {
+						if (s.spix == spix) {
+							return s;
+						} else {
+							s = s.next;
+						}
+					}
 					l = l.next;
 				}
 			}
@@ -58,9 +66,17 @@ public class Scope {
 
 	public void closeScope() throws ParseException {
 		Symbol l = locals;
+		
+		/* debug print */
+		while (l != null) {
+			System.out.println("--> Scope: closeScope() defined Symbol " + l);
+			l = l.next;
+		}
+		
+		l = locals;
 		while (l != null) {
 			if (l.type == Type.undefType) {
-				throw new ParseException("Scope: closeScope(): FUUU!!!! leave me alone with your horseshit! (╯°□°）╯︵ ┻━┻");
+				throw new ParseException("Scope: closeScope(): undefined symbol " + l.name + "! FUUU!!!! leave me alone with your horseshit! (╯°□°）╯︵ ┻━┻");
 			}
 			l = l.next;
 		}
